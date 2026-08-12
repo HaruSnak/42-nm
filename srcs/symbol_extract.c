@@ -47,32 +47,38 @@ static int	list_push(t_symbol_list *list, t_symbol *sym) {
 /*
 	Récupère les sh_flags et sh_type de la section à l'index donné (64 bits).
 	SHN_LORESERVE = 0xff00 : au-dessus, les indices sont des valeurs spéciales.
+
+	L'adresse de l'entrée est calculée avec ctx->shentsize comme pas réel
+	(et non sizeof(Elf64_Shdr)) : voir le commentaire de
+	elf_shentsize_matches_reference() dans elf_parse_header.c pour la raison
+	(indexer un tableau Elf64_Shdr* suppose à tort que shentsize ==
+	sizeof(Elf64_Shdr), ce qui peut faire lire hors de la zone mmap'ée).
 */
 static void	get_section_info_64(const t_elf_ctx *ctx, t_u16 shndx, t_u64 *sh_flags, t_u32 *sh_type) {
-	const Elf64_Shdr	*shdr_table;
+	const Elf64_Shdr	*section_header;
 
 	*sh_flags = 0;
 	*sh_type = 0;
 	if (shndx >= SHN_LORESERVE || shndx >= ctx->shnum)
 		return ;
-	shdr_table = (const Elf64_Shdr *)((const char *)ctx->mapped_data
-			+ ctx->shoff);
-	*sh_flags = shdr_table[shndx].sh_flags;
-	*sh_type = shdr_table[shndx].sh_type;
+	section_header = (const Elf64_Shdr *)((const char *)ctx->mapped_data
+			+ ctx->shoff + (size_t)shndx * (size_t)ctx->shentsize);
+	*sh_flags = section_header->sh_flags;
+	*sh_type = section_header->sh_type;
 }
 
 // Idem pour 32 bits.
 static void	get_section_info_32(const t_elf_ctx *ctx, t_u16 shndx, t_u64 *sh_flags, t_u32 *sh_type) {
-	const Elf32_Shdr	*shdr_table;
+	const Elf32_Shdr	*section_header;
 
 	*sh_flags = 0;
 	*sh_type = 0;
 	if (shndx >= SHN_LORESERVE || shndx >= ctx->shnum)
 		return ;
-	shdr_table = (const Elf32_Shdr *)((const char *)ctx->mapped_data
-			+ ctx->shoff);
-	*sh_flags = (t_u64)shdr_table[shndx].sh_flags;
-	*sh_type = shdr_table[shndx].sh_type;
+	section_header = (const Elf32_Shdr *)((const char *)ctx->mapped_data
+			+ ctx->shoff + (size_t)shndx * (size_t)ctx->shentsize);
+	*sh_flags = (t_u64)section_header->sh_flags;
+	*sh_type = section_header->sh_type;
 }
 
 // Parcourt la symtab 64 bits et crée un t_symbol pour chaque entrée valide.

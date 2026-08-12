@@ -20,9 +20,14 @@ static char	uppercase_if_global(char base_lower, int binding) {
 	B / b       — section BSS (SHT_NOBITS, non initialisée)
 	R / r       — section lecture seule (.rodata)
 	D / d       — section données initialisées (.data)
-	?           — inconnu
+	i           — fonction indirecte (STT_GNU_IFUNC, ex : resolvers glibc)
+	N           — symbole de débogage : section sans SHF_ALLOC (.debug_*...)
 
-	Majuscule = global ou weak défini, minuscule = local.
+	Majuscule = global ou weak défini, minuscule = local. i et N font
+	exception : GNU nm les affiche toujours dans la même casse, quel que
+	soit le binding (confirmé en diffant ft_nm/nm sur des binaires réels :
+	binaires statiques pour i, modules Perl XS et bibliothèques avec DWARF
+	pour N).
 
 	Paramètres :
 	shndx    — st_shndx du symbole (peut être SHN_UNDEF, SHN_ABS, SHN_COMMON)
@@ -36,6 +41,9 @@ char	symbol_get_type(t_u16 shndx, t_u8 st_info, t_u64 sh_flags, t_u32 sh_type) {
 
 	binding = (st_info >> 4);
 	sym_type = (st_info & 0xf);
+	// Fonction indirecte : prioritaire sur le binding (même si weak)
+	if (sym_type == STT_GNU_IFUNC)
+		return ('i');
 	// Weak : traité avant les vérifications de section
 	if (binding == STB_WEAK) {
 		if (shndx == SHN_UNDEF)
@@ -65,5 +73,7 @@ char	symbol_get_type(t_u16 shndx, t_u8 st_info, t_u64 sh_flags, t_u32 sh_type) {
 		return (uppercase_if_global('r', binding));
 	if (sh_flags & SHF_ALLOC)
 		return (uppercase_if_global('d', binding));
-	return ('?');
+	// Section non chargée en mémoire (SHF_ALLOC absent) : symbole de
+	// débogage (ex : .debug_info) — GNU nm l'affiche toujours 'N'.
+	return ('N');
 }

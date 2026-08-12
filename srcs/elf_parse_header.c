@@ -1,6 +1,24 @@
 #include "ft_nm.h"
 
 /*
+	Le sujet impose de confronter chaque valeur parsée à une référence connue.
+	e_shentsize doit être au moins aussi grand que la vraie structure
+	Elf64_Shdr / Elf32_Shdr : tout le code qui parcourt la section header
+	table calcule l'adresse de l'entrée i via shoff + i * e_shentsize, puis
+	la relit comme une Elf64_Shdr/Elf32_Shdr complète. Un e_shentsize
+	déclaré plus petit que la référence permettrait de faire valider une
+	toute petite zone (shnum * e_shentsize) par bounds_ok(), alors que la
+	lecture réelle de chaque entrée déborderait largement au-delà de cette
+	zone, jusqu'en dehors du fichier mmap'é (SIGBUS/SIGSEGV confirmé).
+*/
+static int	elf_shentsize_matches_reference(int is_64bit, t_u16 declared_shentsize) {
+	size_t	reference_shentsize;
+
+	reference_shentsize = is_64bit ? sizeof(Elf64_Shdr) : sizeof(Elf32_Shdr);
+	return ((size_t)declared_shentsize >= reference_shentsize);
+}
+
+/*
 	Lit l'e_ident pour déterminer la classe (32/64) et l'endianness.
 	Puis extrait depuis le ELF header les champs nécessaires à l'analyse
 	de la section header table : e_shoff, e_shentsize, e_shnum, e_shstrndx.
@@ -54,6 +72,10 @@ int	elf_parse_header(t_elf_ctx *ctx, const char *filename) {
 	}
 	// Valide que la section header table entière est dans le fichier
 	if (ctx->shnum > 0 && ctx->shentsize > 0) {
+		if (!elf_shentsize_matches_reference(ctx->is_64bit, ctx->shentsize)) {
+			ft_error(filename, "section header entry size does not match ELF class");
+			return (-1);
+		}
 		if (!bounds_ok(ctx, (size_t)ctx->shoff, (size_t)ctx->shnum * (size_t)ctx->shentsize)) {
 			ft_error(filename, "section header table out of bounds");
 			return (-1);

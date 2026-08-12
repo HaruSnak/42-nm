@@ -1,5 +1,9 @@
 #include "ft_nm.h"
 
+// Comme le vrai nm, invoqué sans argument on lit "a.out" dans le répertoire
+// courant (voir `man nm`), plutôt qu'un simple message d'usage.
+# define FT_NM_DEFAULT_FILENAME "a.out"
+
 /*
 	Traite un seul fichier ELF : chargement, validation, parsing, extraction,
 	tri et affichage. Le header de fichier (en mode multi) est géré par main.
@@ -58,16 +62,14 @@ int	main(int argc, char **argv)
 {
 	int	exit_code;
 	int	multi_file;
-	int	i;
+	int	file_index;
 
-	if (argc < 2) {
-		ft_putstr_fd(2, "Usage: ft_nm <file> [file...]\n");
-		return (1);
-	}
+	if (argc < 2)
+		return (process_file(FT_NM_DEFAULT_FILENAME));
 	exit_code = 0;
 	multi_file = (argc > 2);
-	i = 1;
-	while (i < argc) {
+	file_index = 1;
+	while (file_index < argc) {
 		if (multi_file) {
 			/*
 				GNU nm affiche une ligne vide avant chaque header de fichier,
@@ -75,11 +77,11 @@ int	main(int argc, char **argv)
 				le fichier n'a pas de symboles.
 			*/
 			ft_putchar_fd(1, '\n');
-			ft_putstr_fd(1, argv[i]);
+			ft_putstr_fd(1, argv[file_index]);
 			ft_putstr_fd(1, ":\n");
 		}
-		exit_code |= process_file(argv[i]);
-		i++;
+		exit_code |= process_file(argv[file_index]);
+		file_index++;
 	}
 	return (exit_code);
 }
